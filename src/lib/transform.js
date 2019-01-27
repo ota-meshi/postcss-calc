@@ -1,5 +1,5 @@
 import selectorParser from 'postcss-selector-parser';
-import valueParser from 'postcss-value-parser'; 
+import valueParser from 'postcss-value-parser';
 
 // eslint-disable-next-line import/no-unresolved
 import { parser } from '../parser';
@@ -18,7 +18,7 @@ function transformValue(value, options, result, item) {
     // stringify calc expression and produce an AST
     const contents = valueParser.stringify(node.nodes);
     const ast = parser.parse(contents);
-    
+
     // reduce AST to its simplest form, that is, either to a single value
     // or a simplified calc expression
     const reducedAst = reducer(ast, options.precision, item);

@@ -1,7 +1,7 @@
 import convert from './convert';
 
 function reduce(node, precision) {
-  if (node.type === "MathExpression") 
+  if (node.type === "MathExpression")
     return reduceMathExpression(node, precision);
 
   return node;
@@ -205,7 +205,7 @@ function reduceAddSubExpression(node, precision) {
       return reduce(node, precision);
     }
     }
-    
+
     if (
         left.type === 'MathExpression' && right.type === 'MathExpression' &&
         op === '-' && right.operator === '-'
