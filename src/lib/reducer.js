@@ -1,33 +1,38 @@
 import convert from './convert';
+import { isCompatibleTypes } from './hepler';
 
 function reduce(node, precision) {
   if (node.type === "MathExpression")
     return reduceMathExpression(node, precision);
+  if (node.type === "Root" || node.type === "Parentheses")
+    return reduceContainer(node, precision);
+  if (node.type === "Function" && /^(-(webkit|moz)-)?calc$/i.test(node.name))
+    return reduceContainer(node, precision);
+
+  return node;
+}
+
+function reduceContainer(node, precision) {
+  if (node.nodes.length === 1)
+    return reduce(node.nodes[0], precision);
 
   return node;
 }
 
 function isEqual(left, right) {
-  return left.type === right.type && left.value === right.value;
+  return isCompatibleTypes(left, right) && left.value === right.value;
 }
 
 function isValueType(type) {
   switch (type) {
-    case 'LengthValue':
-    case 'AngleValue':
-    case 'TimeValue':
-    case 'FrequencyValue':
-    case 'ResolutionValue':
-    case 'EmValue':
-    case 'ExValue':
-    case 'ChValue':
-    case 'RemValue':
-    case 'VhValue':
-    case 'VwValue':
-    case 'VminValue':
-    case 'VmaxValue':
-    case 'PercentageValue':
-    case 'Value':
+    case "Number":
+    case "Length":
+    case "Angle":
+    case "Time":
+    case "Frequency":
+    case "Resolution":
+    case "Percentage":
+    case "Flex":
       return true;
   }
   return false;
@@ -79,7 +84,8 @@ function flipValue(node) {
 function reduceAddSubExpression(node, precision) {
   const {left, right, operator: op} = node;
 
-  if (left.type === 'Function' || right.type === 'Function')
+  if ((!isValueType(left.type) && left.type !== 'MathExpression') ||
+    (!isValueType(right.type) && right.type !== 'MathExpression'))
     return node;
 
   // something + 0 => something
@@ -97,7 +103,7 @@ function reduceAddSubExpression(node, precision) {
 
   // value + value
   // value - value
-  if (left.type === right.type && isValueType(left.type)) {
+  if (isCompatibleTypes(left, right) && isValueType(left.type)) {
     node = Object.assign({ }, left);
     if (op === "+")
       node.value = left.value + right.value;
@@ -115,7 +121,7 @@ function reduceAddSubExpression(node, precision) {
     // value + (value - something) => (value + value) - something
     // value - (value + something) => (value - value) - something
     // value - (value - something) => (value - value) + something
-    if (left.type === right.left.type) {
+    if (isCompatibleTypes(left, right.left)) {
       node = Object.assign({ }, node);
       node.left = reduce({
         type: 'MathExpression',
@@ -131,7 +137,7 @@ function reduceAddSubExpression(node, precision) {
     // value + (something - value) => (value - value) + something
     // value - (something + value) => (value - value) - something
     // value - (something - value) => (value + value) - something
-    else if (left.type === right.right.type) {
+    else if (isCompatibleTypes(left, right.right)) {
       node = Object.assign({ }, node);
       node.left = reduce({
         type: 'MathExpression',
@@ -160,7 +166,7 @@ function reduceAddSubExpression(node, precision) {
     // (value - something) + value => (value + value) - something
     // (value + something) - value => (value - value) + something
     // (value - something) - value => (value - value) - something
-    if (right.type === left.left.type) {
+    if (isCompatibleTypes(right, left.left)) {
       node = Object.assign({ }, left);
       node.left = reduce({
         type: 'MathExpression',
@@ -174,7 +180,7 @@ function reduceAddSubExpression(node, precision) {
     // (something - value1) + value2 => something - (value2 - value1)
     // (something + value) - value => something + (value - value)
     // (something - value) - value => something - (value + value)
-    else if (right.type === left.right.type) {
+    else if (isCompatibleTypes(right, left.right)) {
       node = Object.assign({ }, left);
       if (left.operator === '-') {
         node.right = reduce({
@@ -219,7 +225,7 @@ function reduceDivisionExpression(node) {
   if (!isValueType(node.right.type))
     return node;
 
-  if (node.right.type !== 'Value')
+  if (node.right.type !== 'Number')
     throw new Error(`Cannot divide by "${node.right.unit}", number expected`);
 
   if (node.right.value === 0)
@@ -235,7 +241,7 @@ function reduceDivisionExpression(node) {
 
 function reduceMultiplicationExpression(node) {
   // (expr) * value
-  if (node.left.type === 'MathExpression' && node.right.type === 'Value') {
+  if (node.left.type === 'MathExpression' && node.right.type === 'Number') {
     if (
       isValueType(node.left.left.type) &&
       isValueType(node.left.right.type)
@@ -246,12 +252,12 @@ function reduceMultiplicationExpression(node) {
     }
   }
   // something * value
-  else if (isValueType(node.left.type) && node.right.type === 'Value') {
+  else if (isValueType(node.left.type) && node.right.type === 'Number') {
     node.left.value *= node.right.value;
     return node.left;
   }
   // value * (expr)
-  else if (node.left.type === 'Value' && node.right.type === 'MathExpression') {
+  else if (node.left.type === 'Number' && node.right.type === 'MathExpression') {
     if (
       isValueType(node.right.left.type) &&
       isValueType(node.right.right.type)
@@ -262,7 +268,7 @@ function reduceMultiplicationExpression(node) {
     }
   }
   // value * something
-  else if (node.left.type === 'Value' && isValueType(node.right.type)) {
+  else if (node.left.type === 'Number' && isValueType(node.right.type)) {
     node.right.value *= node.left.value;
     return node.right;
   }

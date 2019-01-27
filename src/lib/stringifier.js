@@ -1,3 +1,5 @@
+import calcAstParser from 'postcss-calc-ast-parser';
+
 const order = {
   "*": 0,
   "/": 0,
@@ -33,12 +35,22 @@ function stringify(node, prec) {
 
       return str;
     }
-    case "Value":
+    case "Number":
       return round(node.value, prec);
-    case 'Function':
-      return node.value;
-    default:
+    case "Length":
+    case "Angle":
+    case "Time":
+    case "Frequency":
+    case "Resolution":
+    case "Percentage":
+    case "Flex":
       return round(node.value, prec) + node.unit;
+    case 'Function':
+      return `${node.name}(${node.nodes.map(stringify).join('')})`
+    case 'Parentheses':
+      return `(${node.nodes.map(stringify).join('')})`
+    default:
+      return calcAstParser.stringify(node);
   }
 }
 
